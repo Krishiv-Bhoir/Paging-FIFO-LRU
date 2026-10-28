@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page Replacement Simulator | FIFO, LRU & Research-Inspired LPR</title>
+<style>
+:root{--ink:#172033;--muted:#667085;--line:#e4e8ef;--bg:#f5f7fb;--blue:#2457d6;--green:#16835f;--red:#c24141;--card:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:15px/1.5 Arial,Helvetica,sans-serif;color:var(--ink)}.wrap{max-width:1000px;margin:28px auto;padding:0 16px}.top{margin-bottom:18px}.eyebrow{color:var(--blue);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase}.top h1{font-size:clamp(25px,4vw,34px);margin:5px 0}.top p{margin:0;color:var(--muted)}.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 4px 14px #16264a08}.controls{display:grid;grid-template-columns:2fr 1fr auto;gap:12px;align-items:end}label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}input,select{width:100%;border:1px solid #cbd3e1;border-radius:8px;padding:11px;font:inherit;background:#fff;color:var(--ink)}button{border:0;border-radius:8px;padding:12px 18px;background:var(--blue);color:white;font:inherit;font-weight:700;cursor:pointer}button:hover{filter:brightness(.94)}.hint{font-size:12px;color:var(--muted);margin-top:7px}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.metric{border:1px solid var(--line);border-radius:10px;padding:13px}.metric small{display:block;color:var(--muted);font-size:12px}.metric strong{font-size:24px}.algo{font-size:12px;font-weight:700;color:var(--blue)}h2{font-size:18px;margin:0 0 12px}.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:center}th{background:#f0f3f9;font-weight:700}td:first-child,th:first-child{text-align:center}.hit{color:var(--green);font-weight:700}.fault{color:var(--red);font-weight:700}.research{border-left:4px solid var(--blue)}.research p{margin:6px 0;color:#344054}.research .note{font-size:12px;color:var(--muted)}a{color:var(--blue)}footer{font-size:12px;color:var(--muted);padding:4px 2px 24px}@media(max-width:650px){.controls{grid-template-columns:1fr}.metrics{grid-template-columns:1fr}.panel{padding:14px}.wrap{margin-top:18px}}
+</style></head>
+<body><main class="wrap">
+<header class="top"><div class="eyebrow">Operating Systems · SLA Simulation</div><h1>Page Replacement Simulator</h1><p>Compare FIFO and LRU with a simple research-inspired adaptive policy.</p></header>
+<section class="panel"><div class="controls"><div><label for="refs">Page reference string</label><input id="refs" value="7, 0, 1, 2, 0, 3, 0, 4" placeholder="Example: 7, 0, 1, 2, 0"><div class="hint">Enter page numbers separated by commas.</div></div><div><label for="frames">Number of frames</label><select id="frames"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></div><button id="run">Run simulation</button></div><div id="error" role="alert" style="color:#b42318;margin-top:10px"></div></section>
+<section class="panel"><h2>Results comparison</h2><div class="metrics" id="metrics"></div></section>
+<section class="panel"><h2>Step-by-step results <span class="algo" id="selectedName"></span></h2><div class="controls" style="grid-template-columns:1fr 1fr;align-items:center;margin-bottom:12px"><div><label for="algorithm">View algorithm</label><select id="algorithm"><option value="FIFO">FIFO</option><option value="LRU">LRU</option><option value="LPR">Research-inspired adaptive (LPR demo)</option></select></div><div class="hint" id="explain">FIFO replaces the page that entered memory earliest.</div></div><div class="tablewrap"><table id="steps"></table></div></section>
+<section class="panel research"><h2>Latest research · 2025</h2><p><strong>Learning-based Page Replacement (LPR)</strong> learns from past page-eviction outcomes and adapts between LRU and MRU policies. The published study reported an average 16% reduction in page faults versus LRU in its scientific-application experiments.</p><p class="note">This webpage's adaptive option is a simplified educational demonstration inspired by the paper, not an exact implementation or reproduction of the researchers' algorithm or experiments.</p><p class="note">Kim, H. (2025), <em>Scientific Reports</em>, 15, 4721. <a href="https://www.nature.com/articles/s41598-025-88736-4" target="_blank" rel="noopener">Read the research paper ↗</a></p></section>
+<footer>Note: Results depend on the selected reference string and frame count. Research-paper results are workload-specific.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function simulate(refs,n,mode){let frames=[],loadOrder=[],lastUsed=new Map(),history=[],hits=0,faults=0,t=0;let scores={LRU:0,MRU:0},pending=new Map();
+ for(const page of refs){t++;let hit=frames.includes(page),evicted='—',policy='—';
+  // If a previously evicted page is requested again, penalize the policy that evicted it and reward its alternative.
+  if(pending.has(page)){let old=pending.get(page);scores[old]-=1;scores[old==='LRU'?'MRU':'LRU']+=1;pending.delete(page)}
+  if(hit){hits++;lastUsed.set(page,t)}else{faults++;if(frames.length<n){frames.push(page);loadOrder.push(page)}else{
+    if(mode==='FIFO'){evicted=loadOrder.shift();frames[frames.indexOf(evicted)]=page;loadOrder.push(page)}
+    else {if(mode==='LPR'){policy=scores.MRU>scores.LRU?'MRU':'LRU'}else policy=mode;
+      if(policy==='LRU'){evicted=frames.reduce((a,b)=>lastUsed.get(a)<lastUsed.get(b)?a:b)}else{evicted=frames.reduce((a,b)=>lastUsed.get(a)>lastUsed.get(b)?a:b)}
+      frames[frames.indexOf(evicted)]=page;
+      if(mode==='LPR')pending.set(evicted,policy);
+    }
+    if(mode==='FIFO')policy='FIFO';
+    loadOrder=loadOrder.filter(p=>frames.includes(p));if(!loadOrder.includes(page))loadOrder.push(page);
+  }
+  lastUsed.set(page,t);
+  }
+  history.push({page,frames:[...frames],result:hit?'Hit':'Fault',evicted,policy,scores:{...scores}})
+ }
+ return {history,hits,faults,rate:refs.length?faults/refs.length*100:0};}
+function render(){const raw=$('refs').value.trim();const error=$('error');error.textContent='';if(!raw){error.textContent='Please enter a page reference string.';return}const parts=raw.split(',').map(x=>x.trim());if(parts.some(x=>!/^\d+$/.test(x))){error.textContent='Use non-negative whole numbers separated by commas.';return}const refs=parts.map(Number);if(refs.length>150){error.textContent='Please use 150 page references or fewer.';return}const n=Number($('frames').value);const results={FIFO:simulate(refs,n,'FIFO'),LRU:simulate(refs,n,'LRU'),LPR:simulate(refs,n,'LPR')};window.results=results;
+ $('metrics').innerHTML=['FIFO','LRU','LPR'].map(k=>`<div class="metric"><small>${k==='LPR'?'Research-inspired adaptive demo':k+' algorithm'}</small><strong>${results[k].faults}</strong><small>Page faults · ${results[k].hits} hits · ${results[k].rate.toFixed(1)}% fault rate</small></div>`).join('');showSteps();}
+function showSteps(){if(!window.results)return;const mode=$('algorithm').value;const r=window.results[mode];$('selectedName').textContent=mode==='LPR'?'· simplified LPR-inspired demo':'';$('explain').textContent=mode==='FIFO'?'Replaces the page that entered memory earliest.':mode==='LRU'?'Replaces the page that has not been used for the longest time.':'Chooses LRU or MRU using simple feedback from pages that are requested again after eviction.';
+ const n=Number($('frames').value);let html='<thead><tr><th>Step</th><th>Page</th>'+Array.from({length:n},(_,i)=>`<th>Frame ${i+1}</th>`).join('')+'<th>Result</th><th>Evicted</th></tr></thead><tbody>';
+ r.history.forEach((row,i)=>{html+=`<tr><td>${i+1}</td><td>${row.page}</td>${Array.from({length:n},(_,j)=>`<td>${row.frames[j]===undefined?'—':row.frames[j]}</td>`).join('')}<td class="${row.result==='Hit'?'hit':'fault'}">${row.result}</td><td>${row.evicted}</td></tr>`});html+='</tbody>'; $('steps').innerHTML=html;}
+$('run').addEventListener('click',render);$('algorithm').addEventListener('change',showSteps);render();
+</script></body></html>
